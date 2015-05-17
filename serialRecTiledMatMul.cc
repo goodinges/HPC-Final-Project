@@ -1,8 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define MIN_BL_SIZE  2
+//TODO #define MIN_BL_SIZE  2
 
+  //TODO
+  int MIN_BL_SIZE;
 void mul(long n, double* a, double* b, double* s);
 
 int main(int argc, char *argv[])
@@ -13,13 +15,15 @@ int main(int argc, char *argv[])
   double* b;
   double* c;
 
-  if(argc != 2)
+  if(argc < 2)
   {
     fprintf(stderr, "Please specify the dimention of the matrices.\n");
     return -1;
   }
 
   n = atol(argv[1]);
+  //TODO
+  MIN_BL_SIZE = atoi(argv[2]);
 
   if(n == 0 || (n & (n - 1)) != 0)
   {

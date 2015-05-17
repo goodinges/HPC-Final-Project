@@ -2,8 +2,10 @@
 #include <stdlib.h>
 #include <omp.h>
 
-#define MIN_BL_SIZE  2
+//TODO #define MIN_BL_SIZE  128
 
+  //TODO
+  int MIN_BL_SIZE;
 void mul(long n, double* a, double* b, double* s);
 
 int main(int argc, char *argv[])
@@ -14,14 +16,15 @@ int main(int argc, char *argv[])
   double* b;
   double* c;
 
-  if(argc != 2)
+  if(argc < 2)
   {
     fprintf(stderr, "Please specify the dimention of the matrices.\n");
     return -1;
   }
 
   n = atol(argv[1]);
-
+  //TODO
+  MIN_BL_SIZE = atoi(argv[2]);
   if(n == 0 || (n & (n - 1)) != 0)
   {
     fprintf(stderr, "The dimention of the matrices must be power of two.\n");
@@ -29,6 +32,7 @@ int main(int argc, char *argv[])
   }
   
   omp_set_nested(1);
+  //omp_set_num_threads(4);
   //TODO Alignment allocations.
   a = (double*) calloc (n*n,sizeof(double));
   b = (double*) calloc (n*n,sizeof(double));
@@ -52,12 +56,13 @@ int main(int argc, char *argv[])
 
 void mul(long n, double* a, double* b, double* s)
 {
+  //printf("threadnum: %d\n", omp_get_thread_num());//TODO
   if (n <= MIN_BL_SIZE)
   {
     for(long i = 0; i < n; i++ ) {
       for(long k = 0; k < n; k++ ) {
-        //#pragma vector aligned
-        //#pragma ivdep
+        #pragma vector aligned
+        #pragma ivdep
         for(long j = 0; j < n; j++ ) {
           s[i*n+j] += a[i*n+k]*b[k*n+j];
         } 

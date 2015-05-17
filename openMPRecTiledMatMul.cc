@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <omp.h>
 
 #define MIN_BL_SIZE  2
 
@@ -27,6 +28,7 @@ int main(int argc, char *argv[])
     return -1;
   }
   
+  omp_set_nested(1);
   //TODO Alignment allocations.
   a = (double*) calloc (n*n,sizeof(double));
   b = (double*) calloc (n*n,sizeof(double));
@@ -38,7 +40,8 @@ int main(int argc, char *argv[])
     b[i] = i + 1;
   }
   mul(n, a, b, c);
-  /*for(long i = 0; i < n*n ; i++ )
+  /*
+  for(long i = 0; i < n*n ; i++ )
   {
     printf("%f ", c[i]);
   }
@@ -82,19 +85,37 @@ void mul(long n, double* a, double* b, double* s)
     egfi = chdj + offset;
     ehfj = egfi + offset;
 
-    mul(n2, c, g, cgdi);
-    mul(n2, c, h, chdj);
-    mul(n2, e, h, ehfj);
-    mul(n2, e, g, egfi);
-    //sync
+#pragma omp parallel
+    {
+#pragma omp sections
+      {
+#pragma omp section
+        mul(n2, c, g, cgdi);
+#pragma omp section
+        mul(n2, c, h, chdj);
+#pragma omp section
+        mul(n2, e, h, ehfj);
+#pragma omp section
+        mul(n2, e, g, egfi);
+      }
+#pragma omp barrier
 
-    mul(n2, d, i, cgdi);
-    mul(n2, d, j, chdj);
-    mul(n2, f, j, ehfj);
-    mul(n2, f, i, egfi);
-    //sync
-
+#pragma omp sections
+      {
+#pragma omp section
+        mul(n2, d, i, cgdi);
+#pragma omp section
+        mul(n2, d, j, chdj);
+#pragma omp section
+        mul(n2, f, j, ehfj);
+#pragma omp section
+        mul(n2, f, i, egfi);
+      }
+#pragma omp barrier
+    }
 
   }
   //TODO convert to curve and back
 }
+//TODO Tuning openMP
+//TODO Tuning Phi

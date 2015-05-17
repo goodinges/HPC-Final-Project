@@ -1,11 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <omp.h>
+#include <time.h>
+#include <sys/time.h>
 
 //TODO #define MIN_BL_SIZE  128
 
   //TODO
-  int MIN_BL_SIZE;
+int MIN_BL_SIZE = 128;
+
 void mul(long n, double* a, double* b, double* s);
 
 int main(int argc, char *argv[])
@@ -23,14 +26,29 @@ int main(int argc, char *argv[])
   }
 
   n = atol(argv[1]);
-  //TODO
-  MIN_BL_SIZE = atoi(argv[2]);
   if(n == 0 || (n & (n - 1)) != 0)
   {
     fprintf(stderr, "The dimention of the matrices must be power of two.\n");
     return -1;
   }
   
+  printf("%ldx%ld Matrix\n", n, n);
+  
+  if(argc > 2)
+  {
+    //TODO
+    MIN_BL_SIZE = atoi(argv[2]);
+  }
+
+  printf("Min Block Size: %d\n", MIN_BL_SIZE);
+
+  if(argc > 3)
+  {
+    omp_set_num_threads(atoi(argv[3]));
+  }
+
+  printf("Number of threads: %d\n", omp_get_max_threads());
+
   omp_set_nested(1);
   //omp_set_num_threads(4);
   //TODO Alignment allocations.
@@ -43,7 +61,21 @@ int main(int argc, char *argv[])
     a[i] = i;
     b[i] = i + 1;
   }
+
+  /* Timeval structures store the start and end time of
+   * initialization and computation. */
+  struct timeval start, end;
+  // Start timing vector initialization loop.
+  gettimeofday(&start, NULL);
+
   mul(n, a, b, c);
+
+  // End timing vector initialization loop.
+  gettimeofday(&end, NULL);
+  // Print execution time of vector initialization loop.
+  printf ("Multiplication time = %f seconds\n",
+      (double) (end.tv_usec - start.tv_usec) / 1000000 +
+      (double) (end.tv_sec - start.tv_sec));
   /*
   for(long i = 0; i < n*n ; i++ )
   {

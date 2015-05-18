@@ -4,9 +4,6 @@
 #include <time.h>
 #include <sys/time.h>
 
-//TODO #define MIN_BL_SIZE  128
-
-  //TODO
 int MIN_BL_SIZE = 128;
 
 void mul(long n, double* a, double* b, double* s);
@@ -42,19 +39,18 @@ int main(int argc, char *argv[])
 
   printf("Min Block Size: %d\n", MIN_BL_SIZE);
 
-  if(argc > 3)
-  {
-    omp_set_num_threads(atoi(argv[3]));
-  }
-
-  printf("Max number of threads: %d\n", omp_get_max_threads());
-
   omp_set_nested(1);
   //omp_set_num_threads(4);
   //TODO Alignment allocations.
+  int ok;
+  ok = posix_memalign((void**)&a, 64, n*n*sizeof(double));
+  ok = posix_memalign((void**)&b, 64, n*n*sizeof(double));
+  ok = posix_memalign((void**)&c, 64, n*n*sizeof(double));
+  /*
   a = (double*) calloc (n*n,sizeof(double));
   b = (double*) calloc (n*n,sizeof(double));
   c = (double*) calloc (n*n,sizeof(double));
+  */
  
   for(long i = 0; i < n*n ; i++ )
   {
@@ -62,31 +58,42 @@ int main(int argc, char *argv[])
     b[i] = i + 1;
   }
 
-  /* Timeval structures store the start and end time of
-   * initialization and computation. */
-  struct timeval start, end;
-  // Start timing vector initialization loop.
-  gettimeofday(&start, NULL);
-
-  mul(n, a, b, c);
-
-  // End timing vector initialization loop.
-  gettimeofday(&end, NULL);
-  // Print execution time of vector initialization loop.
-  printf ("Multiplication time = %f seconds\n",
-      (double) (end.tv_usec - start.tv_usec) / 1000000 +
-      (double) (end.tv_sec - start.tv_sec));
-  /*
-  for(long i = 0; i < n*n ; i++ )
+#pragma offload target(mic:0) in(a,b:length(n*n)) inout(c:length(n*n)) 
   {
-    printf("%f ", c[i]);
+
+    if(argc > 3)
+    {
+      omp_set_num_threads(atoi(argv[3]));
+    }
+
+    printf("Number of threads: %d\n", omp_get_max_threads());
+
+    /* Timeval structures store the start and end time of
+     * initialization and computation. */
+    struct timeval start, end;
+    // Start timing vector initialization loop.
+    gettimeofday(&start, NULL);
+
+    mul(n, a, b, c);
+
+    // End timing vector initialization loop.
+    gettimeofday(&end, NULL);
+    // Print execution time of vector initialization loop.
+    printf ("Multiplication time = %f seconds\n",
+        (double) (end.tv_usec - start.tv_usec) / 1000000 +
+        (double) (end.tv_sec - start.tv_sec));
+    /*
+       for(long i = 0; i < n*n ; i++ )
+       {
+       printf("%f ", c[i]);
+       }
+       printf("\n");
+       */
   }
-  printf("\n");
-  */
   printf("n-1th: %f\n", c[n-1]);
 }
 
-void mul(long n, double* a, double* b, double* s)
+__attribute__((target(mic:0))) void mul(long n, double* a, double* b, double* s)
 {
   //printf("threadnum: %d\n", omp_get_thread_num());//TODO
   if (n <= MIN_BL_SIZE)

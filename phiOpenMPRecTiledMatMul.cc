@@ -4,9 +4,9 @@
 #include <time.h>
 #include <sys/time.h>
 
-int MIN_BL_SIZE = 128;
+//__attribute__ ((target(mic))) int MIN_BL_SIZE = 128;
 
-void mul(long n, double* a, double* b, double* s);
+__attribute__((target(mic))) void mul(long n, double* a, double* b, double* s, int MIN_BL_SIZE, int num_threads);
 
 int main(int argc, char *argv[])
 {
@@ -31,15 +31,21 @@ int main(int argc, char *argv[])
   
   printf("%ldx%ld Matrix\n", n, n);
   
+  int MIN_BL_SIZE = 128;
+
   if(argc > 2)
   {
-    //TODO
     MIN_BL_SIZE = atoi(argv[2]);
   }
 
   printf("Min Block Size: %d\n", MIN_BL_SIZE);
 
-  omp_set_nested(1);
+  int num_threads = -1;
+  if(argc > 3)
+  {
+    num_threads = (atoi(argv[3]));
+  }
+
   //omp_set_num_threads(4);
   //TODO Alignment allocations.
   int ok;
@@ -60,13 +66,13 @@ int main(int argc, char *argv[])
 
 #pragma offload target(mic:0) in(a,b:length(n*n)) inout(c:length(n*n)) 
   {
-
-    if(argc > 3)
+    omp_set_nested(1);
+    if(num_threads == -1)
     {
-      omp_set_num_threads(atoi(argv[3]));
+      num_threads = omp_get_max_threads();
     }
 
-    printf("Number of threads: %d\n", omp_get_max_threads());
+    printf("Number of threads: %d\n", num_threads);
 
     /* Timeval structures store the start and end time of
      * initialization and computation. */
@@ -74,7 +80,7 @@ int main(int argc, char *argv[])
     // Start timing vector initialization loop.
     gettimeofday(&start, NULL);
 
-    mul(n, a, b, c);
+    mul(n, a, b, c, MIN_BL_SIZE, num_threads);
 
     // End timing vector initialization loop.
     gettimeofday(&end, NULL);
@@ -82,18 +88,12 @@ int main(int argc, char *argv[])
     printf ("Multiplication time = %f seconds\n",
         (double) (end.tv_usec - start.tv_usec) / 1000000 +
         (double) (end.tv_sec - start.tv_sec));
-    /*
-       for(long i = 0; i < n*n ; i++ )
-       {
-       printf("%f ", c[i]);
-       }
-       printf("\n");
-       */
+       
   }
   printf("n-1th: %f\n", c[n-1]);
 }
 
-__attribute__((target(mic:0))) void mul(long n, double* a, double* b, double* s)
+void mul(long n, double* a, double* b, double* s, int MIN_BL_SIZE, int num_threads)
 {
   //printf("threadnum: %d\n", omp_get_thread_num());//TODO
   if (n <= MIN_BL_SIZE)
@@ -107,6 +107,13 @@ __attribute__((target(mic:0))) void mul(long n, double* a, double* b, double* s)
         } 
       }
     }
+	/*printf("n: %ld, MIN:%d\n", n,MIN_BL_SIZE);
+	  for(long i = 0; i < n*n ; i++ )
+	  {
+		  printf("%f ", s[i]);
+	  }
+	  printf("\n");
+*/
   } else {
     long n2 = n/2;
     long offset = (n*n)/4;
@@ -129,31 +136,48 @@ __attribute__((target(mic:0))) void mul(long n, double* a, double* b, double* s)
     egfi = chdj + offset;
     ehfj = egfi + offset;
 
-#pragma omp parallel
+    int nxt_lvl_num_thrds[4] = {1, 1, 1, 1};
+    int crr_lvl_num_thrds = num_threads;
+    if(num_threads >= 4)
     {
+      crr_lvl_num_thrds = 4;
+      int tmp = num_threads/4;
+      for(int i = 0; i < 4; i++)
+      {
+        nxt_lvl_num_thrds[i] = tmp;
+      }
+      for(int i = 0; i < num_threads%4; i++)
+      {
+        nxt_lvl_num_thrds[i]++;
+      }
+    }
+#pragma omp parallel num_threads(crr_lvl_num_thrds)
+    {
+//#pragma omp single
+//    printf("Number of actual threads, lvl: %d, %d\n", omp_get_num_threads(), omp_get_level());
 #pragma omp sections
       {
 #pragma omp section
-        mul(n2, c, g, cgdi);
+        mul(n2, c, g, cgdi, MIN_BL_SIZE, nxt_lvl_num_thrds[0]);
 #pragma omp section
-        mul(n2, c, h, chdj);
+        mul(n2, c, h, chdj, MIN_BL_SIZE, nxt_lvl_num_thrds[1]);
 #pragma omp section
-        mul(n2, e, h, ehfj);
+        mul(n2, e, h, ehfj, MIN_BL_SIZE, nxt_lvl_num_thrds[2]);
 #pragma omp section
-        mul(n2, e, g, egfi);
+        mul(n2, e, g, egfi, MIN_BL_SIZE, nxt_lvl_num_thrds[3]);
       }
 #pragma omp barrier
 
 #pragma omp sections
       {
 #pragma omp section
-        mul(n2, d, i, cgdi);
+        mul(n2, d, i, cgdi, MIN_BL_SIZE, nxt_lvl_num_thrds[0]);
 #pragma omp section
-        mul(n2, d, j, chdj);
+        mul(n2, d, j, chdj, MIN_BL_SIZE, nxt_lvl_num_thrds[1]);
 #pragma omp section
-        mul(n2, f, j, ehfj);
+        mul(n2, f, j, ehfj, MIN_BL_SIZE, nxt_lvl_num_thrds[2]);
 #pragma omp section
-        mul(n2, f, i, egfi);
+        mul(n2, f, i, egfi, MIN_BL_SIZE, nxt_lvl_num_thrds[3]);
       }
 #pragma omp barrier
     }

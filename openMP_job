@@ -1,0 +1,26 @@
+#!/bin/bash
+#----------------------------------------------------
+#SBATCH -J phi_job       # Job name
+#SBATCH -o phi_job.o%j   # Name of stdout output file(%j expands to jobId)
+#SBATCH -e phi_job.o%j   # Name of stderr output file(%j expands to jobId)
+#SBATCH -p development           # Submit to the 'normal' or 'development' queue
+#SBATCH -N 1                # Total number of nodes requested (16 cores/node)
+#SBATCH -n 1                # Total number of mpi tasks requested
+#SBATCH -t 01:30:00         # Run time (hh:mm:ss) - 1.5 hours
+#SBATCH --mail-user=kn906@nyu.edu
+#SBATCH --mail-type=begin  # email me when the job starts
+#SBATCH --mail-type=end    # email me when the job finishes
+#SBATCH -A TG-ASC150003    # account number
+# #SBATCH -A A-yourproject  # Allocation name to charge job against
+
+# Set the number of threads per task(Default=1)
+#export OMP_NUM_THREADS=8
+export MIC_ENV_PREFIX=MIC  MIC_OMP_NUM_THREADS=10  KMP_AFFINITY=scatter MIC_KMP_AFFINITY=compact
+
+# For Automatic Offloading
+export MKL_MIC_ENABLE=1
+export MKL_MIC_WORKDIVISION0=1 MKL_MIC_WORKDIVISION1=0
+export OFFLOAD_REPORT=3
+
+# Run the OpenMP application
+./openMPRecTiledMatMul 128 128 4
